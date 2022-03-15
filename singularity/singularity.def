@@ -1,0 +1,91 @@
+Bootstrap: library
+From: airl_lab/default/airl_env:base_ci
+
+%labels Author ljb818@ic.ac.uk
+    # adapted from Luca Grillotti
+    # adapted from Antoine Cully
+    Version v0.0.1
+
+%post
+    export LD_LIBRARY_PATH="/workspace/lib:$LD_LIBRARY_PATH"
+    cd /git/sferes2
+
+    mkdir -p /git/sferes2/exp/map_elites_IMGEP
+    cd /git/sferes2/exp/
+    git clone  --recurse-submodules --single-branch --branch maze_env https://gitlab.doc.ic.ac.uk/AIRL/students_projects/2019-2020/lorenzo_bernasconi/intrinsic_rewards/map_elites_IMGEP.git ./maze_env
+    
+    cd /git/sferes2
+
+
+    # Install Useful libraries
+    apt-get update
+    # apt-get upgrade -y # REMOVED because installs cuda-10.2 and gives linker issues
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get install -y  python3-matplotlib python3-numpy python3.6-dev python3-pip python3.6-tk libboost-all-dev
+
+
+    # Install nn2 from original Repository, and libfastsim from JBM repo
+    apt-get install -y libsdl1.2-dev # First install SDL1.2 for libfastsim
+    
+    cd /git/sferes2/modules/
+    git clone https://github.com/alexendy/pyfastsim.git pyfastsim/
+    cd pyfastsim
+
+    # install libfastsim
+    git clone https://github.com/jbmouret/libfastsim.git libfastsim/
+    sed -i 's/print \(.*\)/print(\1)/g' ./libfastsim/wscript # adapting wscript from libfastsim to Python3
+
+    # Install FastSim Library in /workspace/ directory
+    cd /git/sferes2/modules/pyfastsim/libfastsim 
+
+    # patch libfastsim installation
+    patch -p1 < ../fastsim-boost2std-fixdisplay.patch
+    
+    ./waf configure
+    ./waf build
+    ./waf install
+
+    cd /git/sferes2/modules/pyfastsim
+    pip3 install .
+
+    # Add library names to configuration file of spheres
+    cd /git/sferes2/
+    echo 'libfastsim' >> modules.conf
+
+    apt-get install -y  gdb
+
+#    alias pip="/usr/local/anaconda/bin/pip"
+    pip3 install numpy -I
+    pip3 install scipy
+    pip3 install Cython
+    pip3 install -U scikit-learn 
+    pip3 install explauto  
+    pip3 install plotly 
+    pip3 install seaborn pandas python-gitlab
+
+    pip3 install imageio  # for creating GIFs
+    pip3 install matplotlib==3.0.3
+
+
+      #The above is a complete hack to make this work with the standard singularity scripts
+   # more code can come here
+   # ...
+   # ...
+   #====================================================================================================
+   exit 0 #NOTFORFINAL - the lines below this "exit" will be executed only when building the final image
+   #====================================================================================================
+
+%runscript
+    CURPATH=$(pwd)
+    if [ ! -d ./results ]; then
+        mkdir results
+    fi
+
+    PATHNAME=$(date +%Y-%m-%d_%H_%M_%S)_$$
+    cd /git/sferes2/exp/maze_env/src
+    mkdir -p $CURPATH/results/$PATHNAME
+
+    ./runner.sh $CURPATH/results/$PATHNAME
+
+%help
+    To Complete

@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<fastsim>
+    <display enable="false"/>
+    <!-- world -->
+    <map name="worlds/maze_extra_hard.pbm" size="600"/>
+
+    <!-- /!\ WARNING /!\ The robot "diameter" is actually a radius ! -->
+    <robot x="60" y="450" theta="45" diameter="10"/> <!-- Start pos : 0.1*size, 0.1*size, pi/4 -->
+
+    <!-- sensors -->
+    <laser range="100" angle="60"/>
+    <laser range="100" angle="45"/>
+    <laser range="100" angle="0"/>
+    <laser range="100" angle="-45"/>
+    <laser range="100" angle="-60"/>
+    <!-- <radar slices="4" color="0"/> --> <!-- radar disabled for now -->
+    <!-- should add bumper but don't know how -->
+</fastsim>
+

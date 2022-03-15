@@ -1,0 +1,94 @@
+Bootstrap: library
+From: lg4615/default/aurora:latest
+
+%labels Author lg4615@ic.ac.uk
+	# adapted from Antoine Cully
+    Version v0.0.1
+
+%post
+   export LD_LIBRARY_PATH="/workspace/lib:$LD_LIBRARY_PATH"
+   cd /git/sferes2/exp/
+
+   if [ ! -z "${CI_JOB_TOKEN}" ] # this enables the automated build in the CI environment
+   then
+        git clone --recurse-submodules https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.doc.ic.ac.uk/AIRL/research_projects/luca_grillotti/Aurora.git aurora/
+   elif [ ! -z "${PERSONAL_TOKEN}" ]
+   then
+        git clone --recurse-submodules https://oauth:${PERSONAL_TOKEN}@gitlab.doc.ic.ac.uk/AIRL/research_projects/luca_grillotti/Aurora.git aurora/
+   else
+        git clone --recurse-submodules https://gitlab.doc.ic.ac.uk/AIRL/research_projects/luca_grillotti/Aurora.git aurora/
+   fi
+
+   if [ ! -z "${CI_COMMIT_SHA}" ]
+   then
+     echo 'Launching the experiment at commit: '${CI_COMMIT_SHA}
+     cd aurora/
+     git checkout ${CI_COMMIT_SHA}
+     git submodule update
+   elif [ ! -z "${BRANCH}" ]
+   then
+     echo 'Launching the experiment from branch: '${BRANCH}
+     cd aurora/
+     git checkout ${BRANCH}
+     git submodule update
+   else
+     echo 'Launching the experiment from branch Master'
+   fi
+
+    # Use setup.sh and fix_build.py from REPOSITORY
+   cp /git/sferes2/exp/aurora/singularity/resources/setup.sh /git/sferes2/
+   cp /git/sferes2/exp/aurora/singularity/resources/fix_build.py /git/sferes2/
+
+   cd /git/sferes2/
+   ./setup.sh -j 6 $SETUP_ARGS
+
+    cd /git/sferes2/exp/aurora
+    python3 -m singularity.hpc_config --path-folder-json /git/sferes2/exp/aurora/
+
+%runscript
+    bash -c 'sleep $[ ( $RANDOM % 90 )  + 1 ]s'
+
+    export HOME=/tmp/home
+    mkdir $HOME
+    D=$(/opt/TurboVNC/bin/vncserver 2>&1 | grep "Desktop" | awk '{print $3}' | sed 's/.*://g')
+    export DISPLAY=':'$D
+
+    CURPATH=$(pwd)
+    cd /git/sferes2/
+    DIRNAME=results_$1
+    PATHNAME=$(date +%Y-%m-%d_%H_%M_%S)_$$
+
+    mkdir -p $CURPATH/$DIRNAME/
+    tmp_dir=$(mktemp -d -p $CURPATH/$DIRNAME/ ${PATHNAME}_XXX)
+    mkdir -p $tmp_dir
+
+
+    executable_name=$1
+    shift
+
+    echo Launching command \'build/exp/aurora/$executable_name -d $tmp_dir "$@"\'
+    build/exp/aurora/$executable_name -d $tmp_dir "$@"
+
+%help
+    To Complete
+
+%apprun gen_job_scripts
+
+
+    python3 /git/sferes2/exp/aurora/submodules/gitlab_notebook/gen_job_script.py "$1"
+
+    python3 /git/sferes2/exp/aurora/experiment_serialiser.py --chosen "$2" --container "$3"
+
+%apprun analysis
+    python3 /git/sferes2/exp/aurora/analysis/analysis_runner.py --data "$1" --number-processes 30
+    CURPATH=$(pwd)
+    echo "Runscript Analysis at "$CURPATH
+    cd /git/sferes2/exp/aurora/
+    git log --decorate --oneline --graph master -n 30 > $CURPATH/git_log.txt
+
+    python3 ./submodules/gitlab_notebook/gen_report.py $CURPATH $CURPATH
+
+%apprun visualisation
+    cd /git/sferes2
+    vglrun ./build/exp/aurora/visualise_hexapod_walls "$@"
+    ./build/exp/aurora/visualise_hexapod_walls "$@"
